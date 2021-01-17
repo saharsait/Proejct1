@@ -1,5 +1,4 @@
 
-
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -9,9 +8,14 @@
 
 int main(void)
 {
+    pid_t pid;
+
     char cmd[CMDLINE_MAX];
+    char *args[] = { cmd, "ECS150", NULL};
+    pid = fork();
 
     while (1) {
+
         char *nl;
         int retval;
 
@@ -40,11 +44,26 @@ int main(void)
         }
 
         /* Regular command */
-        retval = system(cmd);
-        fprintf(stderr, "+ completed '%s' [%d]\n",
-                cmd, retval);
+        //retval = system(cmd);
+        pid = fork();
+        if (pid == 0) {
+            /* Child */
+            retval = execlp(cmd, cmd, NULL);
+            perror("execv");
+            exit(1);
+        } else if (pid > 0) {
+            /* Parent */
+            int status;
+            waitpid(pid, &status, 0);
+            printf("Child returned %d\n",
+                   WEXITSTATUS(status));
+        } else {
+            perror("fork");
+            exit(1);
+        }
+
+        fprintf(stderr, "+ completed '%s' [%d]\n", cmd, retval);
     }
 
     return EXIT_SUCCESS;
 }
-
