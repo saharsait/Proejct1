@@ -4,7 +4,6 @@
 #include <string.h>
 #include <unistd.h>
 
-//hello
 
 #define CMDLINE_MAX 512
 
@@ -22,7 +21,7 @@ int main(void)
         int retval;
 
         /* Print prompt */
-        printf("sshell$ ");
+        printf("sshell@ucd$ ");
         fflush(stdout);
 
         /* Get command line */
