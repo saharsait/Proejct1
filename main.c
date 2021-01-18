@@ -7,6 +7,26 @@
 
 #define CMDLINE_MAX 512
 
+void cmd_check(char* cmd){
+
+    int word_ctr = 1;
+    for(int i = 0; i < 15; i++){
+        if(cmd[i]==' '){
+            word_ctr++;
+        }
+    }
+    /* Print command line if stdin is not provided by terminal */
+    if (!isatty(STDIN_FILENO)) {
+        printf("%s", cmd);
+        fflush(stdout);
+    }
+    /* check if arguments exceed 16 */
+    else if(word_ctr > 15){
+        printf("Error: too many process arguments \n");
+    }
+
+}
+
 int main(void)
 {
     pid_t pid;
@@ -26,12 +46,7 @@ int main(void)
 
         /* Get command line */
         fgets(cmd, CMDLINE_MAX, stdin);
-
-        /* Print command line if stdin is not provided by terminal */
-        if (!isatty(STDIN_FILENO)) {
-            printf("%s", cmd);
-            fflush(stdout);
-        }
+        cmd_check(cmd);
 
         /* Remove trailing newline from command line */
         nl = strchr(cmd, '\n');
@@ -46,23 +61,23 @@ int main(void)
         }
 
         /* Regular command */
-        //retval = system(cmd);
-        pid = fork();
-        if (pid == 0) {
-            /* Child */
-            retval = execlp(cmd, cmd, NULL);
-            perror("execv");
-            exit(1);
-        } else if (pid > 0) {
-            /* Parent */
-            int status;
-            waitpid(pid, &status, 0);
-            printf("Child returned %d\n",
-                   WEXITSTATUS(status));
-        } else {
-            perror("fork");
-            exit(1);
-        }
+        retval = system(cmd);
+//         pid = fork();
+//         if (pid == 0) {
+//             /* Child */
+//             retval = execlp(cmd, cmd, NULL);
+//             perror("execv");
+//             exit(1);
+//         } else if (pid > 0) {
+//             /* Parent */
+//             int status;
+//             waitpid(pid, &status, 0);
+//             printf("Child returned %d\n",
+//                    WEXITSTATUS(status));
+//         } else {
+//             perror("fork");
+//             exit(1);
+//         }
 
         fprintf(stderr, "+ completed '%s' [%d]\n", cmd, retval);
     }
