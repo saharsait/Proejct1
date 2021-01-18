@@ -6,18 +6,23 @@
 
 
 #define CMDLINE_MAX 512
+int token_ctr = 0;
 
 void cmd_check(char* cmd){
 
     int word_ctr = 1;
-    int token_ctr = 0;
-    bool token_check;
-    for(int i = 0; i < 15; i++){
+    bool token_check = true;
+    for(int i = 0; i < strlen(cmd)-1; i++){
         token_ctr++;
+        if(token_ctr >= 32){
+            token_check = !token_check;
+            token_ctr = 0;
+        }
         if(cmd[i]==' '){
             word_ctr++;
             if(token_ctr >= 32){
-                token_check == false;
+                token_check = !token_check;
+                token_ctr = 0;
             }
         }
     }
