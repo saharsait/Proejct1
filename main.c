@@ -10,9 +10,15 @@
 void cmd_check(char* cmd){
 
     int word_ctr = 1;
+    int token_ctr = 0;
+    bool token_check;
     for(int i = 0; i < 15; i++){
+        token_ctr++;
         if(cmd[i]==' '){
             word_ctr++;
+            if(token_ctr >= 32){
+                token_check == false;
+            }
         }
     }
     /* Print command line if stdin is not provided by terminal */
@@ -23,6 +29,10 @@ void cmd_check(char* cmd){
     /* check if arguments exceed 16 */
     else if(word_ctr > 15){
         printf("Error: too many process arguments \n");
+    }
+     /* check if argument exceeds 32 */
+    else if (!(token_check)){
+        printf("Error: exceeded max token count \n");
     }
 
 }
