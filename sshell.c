@@ -143,33 +143,6 @@ int execution(struct CMD_LINE CMD) {
 
 }
 
-bool check_env_var(char *cmd) {
-
-    char *echo_exist;
-    char *sign_exist;
-    int sign_index;
-    bool env_var = false;
-
-    echo_exist = strstr(cmd, "echo");
-    sign_exist = strstr(cmd, "$");
-    for (unsigned int i = 0; i < strlen(cmd) - 1; i++) {
-        if (cmd[i] == '$') {
-            sign_index = i;
-        }
-    }
-
-    if (echo_exist < sign_exist) {
-        if (islower(cmd[sign_index + 1]) && (cmd[sign_index + 2] == ' ' || sign_index + 1 == strlen(cmd) - 2)) {
-            env_var = true;
-        } else {
-            fprintf(stderr, "Error: invalid variable name \n");
-            fflush(stdout);
-            env_var = false;
-
-        }
-    }
-    return env_var;
-}
 
 
 
@@ -178,7 +151,7 @@ int main(void) {
 //    char cmd_unchanged[CMDLINE_MAX];
 //    char *path = "/bin/";
 //    char full_path[P_MAX];
-    bool env_var = false;
+//    bool env_var = false;
 
     while (1) {
         char *nl;
