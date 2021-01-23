@@ -23,6 +23,13 @@ struct CMD_LINE {
 
 };
 
+void redirection_output(struct CMD_LINE CMD) {
+    int fd;
+    fd = open(CMD.redirection_file, O_WRONLY | O_CREAT | O_APPEND, 0600);
+    dup2(fd, STDOUT_FILENO);
+    close(fd);
+}
+
 struct CMD_LINE redirection_check(struct CMD_LINE CMD, char *cmd) {
     CMD.redirection = 0;
     int cmd_index;
@@ -87,12 +94,6 @@ struct CMD_LINE piping_check(struct CMD_LINE CMD, char *cmd) {
         fflush(stdout);
     }
     return CMD;
-}
-void redirection_output(struct CMD_LINE CMD) {
-    int fd;
-    fd = open(CMD.redirection_file, O_WRONLY | O_CREAT | O_APPEND, 0600);
-    dup2(fd, STDOUT_FILENO);
-    close(fd);
 }
 
 struct CMD_LINE parsing(struct CMD_LINE CMD, char *cmd) {
@@ -218,37 +219,43 @@ int main(void) {
         // the command line first, then check if it's valid and follows all
         // the specified rules in the prompt
         struct CMD_LINE CMD;
+        CMD = piping_check(CMD, cmd);
         CMD = redirection_check(CMD, cmd);
-        struct CMD_LINE cmd_parsed = parsing(CMD, cmd);
-        /* Builtin command */
-        if (!strcmp(cmd, "exit")) {
-            fprintf(stderr, "Bye...\n");
-            fprintf(stderr, "+ completed '%s' [%d]\n",
-                    cmd_unchanged, 0);
-            break;
-        }
-            //https://iq.opengenus.org/chdir-fchdir-getcwd-in-c/ for getcwd
-        else if (!strcmp(cmd, "pwd")) {
-            char *current_path;
-            char *buffer = NULL;
-            current_path = getcwd(buffer, 0);
-            //Since we're assuming the builtin commands will
-            // always be correct,no need to check for errors
-            fprintf(stderr, "%s\n", current_path);
-        }
-            //https://iq.opengenus.org/chdir-fchdir-getcwd-in-c/ for chdir
-        else if (!strcmp(cmd, "cd")) {
-            int new_dir = chdir(cmd_parsed.argv[1]);
-            if (new_dir == -1) {
-                fprintf(stderr, "Error: cannot cd into directory");
-                fprintf(stderr, "+ completed '%s' [%d]\n", cmd_unchanged, 0);
+        if (CMD.piping == 0) {             // without piping
+            struct CMD_LINE cmd_parsed = parsing(CMD, cmd);
+            /* Builtin command */
+            if (!strcmp(cmd, "exit")) {
+                fprintf(stderr, "Bye...\n");
+                fprintf(stderr, "+ completed '%s' [%d]\n",
+                        cmd_unchanged, 0);
                 break;
             }
+                //https://iq.opengenus.org/chdir-fchdir-getcwd-in-c/ for getcwd
+            else if (!strcmp(cmd, "pwd")) {
+                char *current_path;
+                char *buffer = NULL;
+                current_path = getcwd(buffer, 0);
+                //Since we're assuming the builtin commands will
+                // always be correct,no need to check for errors
+                fprintf(stderr, "%s\n", current_path);
+            }
+                //https://iq.opengenus.org/chdir-fchdir-getcwd-in-c/ for chdir
+            else if (!strcmp(cmd, "cd")) {
+                int new_dir = chdir(cmd_parsed.argv[1]);
+                if (new_dir == -1) {
+                    fprintf(stderr, "Error: cannot cd into directory");
+                    fprintf(stderr, "+ completed '%s' [%d]\n", cmd_unchanged, 0);
+                    break;
+                }
+            }
+            else {
+                /* Regular command */
+                retval = execution(cmd_parsed);
+            }
+
         }
-        else {
-            /* Regular command */
-            retval = execution(cmd_parsed);
-        }
+
+
         fprintf(stderr, "+ completed '%s' [%d]\n", cmd_unchanged, retval);
     }
     return EXIT_SUCCESS;
