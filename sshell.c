@@ -148,7 +148,7 @@ int execution(struct CMD_LINE CMD) {
 
 int main(void) {
     char cmd[CMDLINE_MAX];
-//    char cmd_unchanged[CMDLINE_MAX];
+    char cmd_unchanged[CMDLINE_MAX];
 //    char *path = "/bin/";
 //    char full_path[P_MAX];
 //    bool env_var = false;
@@ -165,6 +165,7 @@ int main(void) {
         if (!fgets(cmd, CMDLINE_MAX, stdin)) {
             break;
         };
+        strcpy(cmd_unchanged, cmd);
 
         //env_var = check_env_var(cmd);
 
@@ -178,7 +179,9 @@ int main(void) {
         nl = strchr(cmd, '\n');
         if (nl)
             *nl = '\0';
-
+        nl = strchr(cmd_unchanged, '\n');
+        if (nl)
+            *nl = '\0';
         //Before determing the type of the command line, we need to parse
         // the command line first, then check if it's valid and follows all
         // the specified rules in the prompt
@@ -190,7 +193,7 @@ int main(void) {
         if (!strcmp(cmd, "exit")) {
             fprintf(stderr, "Bye...\n");
             fprintf(stderr, "+ completed '%s' [%d]\n",
-                    cmd, 0);
+                    cmd_unchanged, 0);
             break;
         }
             //https://iq.opengenus.org/chdir-fchdir-getcwd-in-c/ for getcwd
@@ -207,8 +210,7 @@ int main(void) {
             int new_dir = chdir(cmd_parsed.argv[1]);
             if (new_dir == -1) {
                 fprintf(stderr, "Error: cannot cd into directory");
-                fprintf(stderr, "+ completed '%s' [%d]\n",
-                        cmd, 0);
+                fprintf(stderr, "+ completed '%s' [%d]\n", cmd_unchanged, 0);
                 break;
             }
         }
@@ -219,7 +221,8 @@ int main(void) {
             /* Regular command */
             retval = execution(cmd_parsed);
         }
-        fprintf(stderr, "+ completed '%s' [%d]\n", cmd, retval);
+
+        fprintf(stderr, "+ completed '%s' [%d]\n", cmd_unchanged, retval);
     }
     return EXIT_SUCCESS;
 }
