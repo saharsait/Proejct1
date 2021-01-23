@@ -31,7 +31,7 @@ struct CMD_LINE piping_check(struct CMD_LINE CMD, char *cmd) {
             CMD.piping++;
         }
     }
-    for (int i = 0; i < strlen(cmd) - 1; i++) {
+    for (unsigned int i = 0; i < strlen(cmd) - 1; i++) {
         if (cmd[i] != ' ') {
             first_char_index = i;
             break;
