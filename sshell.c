@@ -37,7 +37,7 @@ struct CMD_LINE redirection_check(struct CMD_LINE CMD, char *cmd) {
     redirection_sign = strstr(cmd, ">");
     piping_sign = strstr(cmd, "|");
 
-    for (int i = 0; i <= strlen(cmd); i++) {
+    for (unsigned int i = 0; i <= strlen(cmd); i++) {
         if (cmd[i] == '>') {
             CMD.redirection = 1;
             cmd[i] = ' ';
@@ -52,7 +52,7 @@ struct CMD_LINE redirection_check(struct CMD_LINE CMD, char *cmd) {
             fprintf(stderr, "Error: missing command\n");
             fflush(stdout);
         }
-        for (int i = cmd_index + 1; i < strlen(cmd); i++) {
+        for (unsigned int i = cmd_index + 1; i < strlen(cmd); i++) {
             if (!isspace(cmd[i])) {
                 cmd_exist_after = true;
             }
@@ -152,7 +152,7 @@ bool check_env_var(char *cmd) {
 
     echo_exist = strstr(cmd, "echo");
     sign_exist = strstr(cmd, "$");
-    for (int i = 0; i < strlen(cmd) - 1; i++) {
+    for (unsigned int i = 0; i < strlen(cmd) - 1; i++) {
         if (cmd[i] == '$') {
             sign_index = i;
         }
@@ -171,17 +171,7 @@ bool check_env_var(char *cmd) {
     return env_var;
 }
 
-void set_func(struct CMD_LINE CMD, char *new_val) {
-    //check the second argument
-    char *check_sign;
-    check_sign = strstr(CMD.argv[2], "$");
-    if (check_sign != NULL) {
-        strcpy(CMD.argv[1], new_val);
-    } else {
-        strcpy(CMD.argv[1], CMD.argv[2]);
-    }
 
-}
 
 int main(void) {
     char cmd[CMDLINE_MAX];
