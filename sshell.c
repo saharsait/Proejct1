@@ -9,24 +9,42 @@
 #include <sys/stat.h>
 #include <sys/wait.h>
 #include <unistd.h>
-#include <ctype.h>
-
 
 #define ARGV_MAX 16
 #define CMDLINE_MAX 512
 #define TOKEN_MAX 32
-#define P_MAX 50
 
 struct CMD_LINE {
     char *argv[ARGV_MAX];
     char cmd[CMDLINE_MAX];
-    char *token[TOKEN_MAX];
     int redirection;
+    int piping;
     char *redirection_file;
 };
+//check how many pipes exist and check if they were implemented correctly
+struct CMD_LINE piping_check(struct CMD_LINE CMD, char *cmd) {
+    CMD.piping = 0;
+    int first_char_index = 0;
 
+    for (unsigned int i = 0; i <= strlen(cmd); i++) {
+        if (cmd[i] == '|') {
+            CMD.piping++;
+        }
+    }
+    for (int i = 0; i < strlen(cmd) - 1; i++) {
+        if (cmd[i] != ' ') {
+            first_char_index = i;
+            break;
+        }
+    }
+    if (cmd[first_char_index] == '>' || cmd[first_char_index] == '|') {
+        fprintf(stderr, "Error: missing command\n");
+        fflush(stdout);
+    }
+    return CMD;
+}
+//check how many redirections exist and check if theu were implemented correctly
 struct CMD_LINE redirection_check(struct CMD_LINE CMD, char *cmd) {
-
     CMD.redirection = 0;
     int cmd_index;
     int space_ctr = 0;
@@ -70,16 +88,13 @@ struct CMD_LINE redirection_check(struct CMD_LINE CMD, char *cmd) {
 }
 
 void redirection_output(struct CMD_LINE CMD) {
-
     int fd;
     fd = open(CMD.redirection_file, O_WRONLY | O_CREAT | O_APPEND, 0600);
     dup2(fd, STDOUT_FILENO);
     close(fd);
-
 }
 
 struct CMD_LINE parsing(struct CMD_LINE CMD, char *cmd) {
-
     char *cmd_token;
     cmd_token = strtok(cmd, " ");
     int argv_ctr = 0;
@@ -106,6 +121,62 @@ struct CMD_LINE parsing(struct CMD_LINE CMD, char *cmd) {
     return CMD;
 }
 
+struct CMD_LINE *piping_parsing(struct CMD_LINE CMD, char *cmd) {
+    struct CMD_LINE *CMD_PIPE_LINE = malloc(sizeof(struct CMD_LINE) * CMD.piping);
+    char *cmd_pipe_token;
+    int cmd_itr = 0;
+    int pipe_itr = 0;
+
+    cmd_pipe_token = strtok(cmd, "|");
+    while (cmd_pipe_token != NULL) {
+        strcpy(CMD_PIPE_LINE[cmd_itr].cmd, cmd_pipe_token);
+        cmd_pipe_token = strtok(NULL, "|");
+        cmd_itr++;
+    }
+
+    for (int i = 0; i <= cmd_itr; i++) {
+        pipe_itr = 0;
+        cmd_pipe_token = strtok(CMD_PIPE_LINE[i].cmd, " ");
+        while (cmd_pipe_token != NULL && pipe_itr < ARGV_MAX) {
+            CMD_PIPE_LINE[i].argv[pipe_itr] = cmd_pipe_token;
+            cmd_pipe_token = strtok(NULL, " ");
+            pipe_itr++;
+        }
+        CMD_PIPE_LINE[i].argv[pipe_itr] = NULL;
+    }
+    return CMD_PIPE_LINE;
+}
+
+// This code was inspired from syscalls lecture 'slide 37'
+void execution_piping(struct CMD_LINE *CMD) {
+    int cmd_pipe[2];
+    int status[CMD->piping - 1];
+    pid_t pid[CMD->piping - 1];
+
+    pipe(cmd_pipe);
+    for (int i = 0; i < CMD->piping - 1; i++) {
+        pid[i] = fork();
+        if (pid[i] == 0) { //child
+            dup2(cmd_pipe[1], STDOUT_FILENO);
+            close(cmd_pipe[0]);
+            close(cmd_pipe[1]);
+            execvp(CMD[i].argv[0], CMD[i].argv);
+            exit(1);
+        }
+        dup2(cmd_pipe[0], STDIN_FILENO);
+        close(cmd_pipe[1]);
+        close(cmd_pipe[0]);
+    }
+    //parent
+    dup2(cmd_pipe[0], STDIN_FILENO);
+    close(cmd_pipe[1]);
+    close(cmd_pipe[0]);
+    execvp(CMD[CMD->piping - 1].argv[0], CMD[CMD->piping - 1].argv);
+    for (int i = 0; i < CMD->piping - 1; i++) {
+        waitpid(pid[i], &status[i], 0); // getting the status of each executed child
+    }
+}
+
 // This code was inspired from syscalls lecture 'slide 20'
 int execution(struct CMD_LINE CMD) {
     pid_t pid;
@@ -119,9 +190,7 @@ int execution(struct CMD_LINE CMD) {
             CMD.redirection = 0;
             redirection_output(CMD);
         }
-
         execvp(CMD.argv[0], CMD.argv);// might use execv
-
         fprintf(stderr, "Error: command not found\n");
         fflush(stdout);
         perror("execvp");
@@ -131,7 +200,6 @@ int execution(struct CMD_LINE CMD) {
         //Waiting for the cloned process 'the child' to until it finish execution
         waitpid(pid, &status, 0);
         stats = WEXITSTATUS(status);
-
     } else {
         //In case of failing
         perror("error with fork");
@@ -143,15 +211,10 @@ int execution(struct CMD_LINE CMD) {
 
 }
 
-
-
-
 int main(void) {
+
     char cmd[CMDLINE_MAX];
     char cmd_unchanged[CMDLINE_MAX];
-//    char *path = "/bin/";
-//    char full_path[P_MAX];
-//    bool env_var = false;
 
     while (1) {
         char *nl;
@@ -165,9 +228,12 @@ int main(void) {
         if (!fgets(cmd, CMDLINE_MAX, stdin)) {
             break;
         };
-        strcpy(cmd_unchanged, cmd);
+        /* Remove trailing newline from command line */
+        nl = strchr(cmd, '\n');
+        if (nl)
+            *nl = '\0';
 
-        //env_var = check_env_var(cmd);
+        strcpy(cmd_unchanged, cmd);
 
         /* Print command line if stdin is not provided by terminal */
         if (!isatty(STDIN_FILENO)) {
@@ -175,53 +241,51 @@ int main(void) {
             fflush(stdout);
         }
 
-        /* Remove trailing newline from command line */
-        nl = strchr(cmd, '\n');
-        if (nl)
-            *nl = '\0';
-        nl = strchr(cmd_unchanged, '\n');
-        if (nl)
-            *nl = '\0';
+        //Copying the commnad into printable one
+        strcpy(cmd_unchanged, cmd);
+
         //Before determing the type of the command line, we need to parse
         // the command line first, then check if it's valid and follows all
         // the specified rules in the prompt
         struct CMD_LINE CMD;
+        CMD = piping_check(CMD, cmd);
         CMD = redirection_check(CMD, cmd);
-        struct CMD_LINE cmd_parsed = parsing(CMD, cmd);
+        if (CMD.piping == 0) { // without piping
 
-        /* Builtin command */
-        if (!strcmp(cmd, "exit")) {
-            fprintf(stderr, "Bye...\n");
-            fprintf(stderr, "+ completed '%s' [%d]\n",
-                    cmd_unchanged, 0);
-            break;
-        }
-            //https://iq.opengenus.org/chdir-fchdir-getcwd-in-c/ for getcwd
-        else if (!strcmp(cmd, "pwd")) {
-            char *current_path;
-            char *buffer = NULL;
-            current_path = getcwd(buffer, 0);
-            //Since we're assuming the builtin commands will
-            // always be correct,no need to check for errors
-            fprintf(stderr, "%s\n", current_path);
-        }
-            //https://iq.opengenus.org/chdir-fchdir-getcwd-in-c/ for chdir
-        else if (!strcmp(cmd, "cd")) {
-            int new_dir = chdir(cmd_parsed.argv[1]);
-            if (new_dir == -1) {
-                fprintf(stderr, "Error: cannot cd into directory");
-                fprintf(stderr, "+ completed '%s' [%d]\n", cmd_unchanged, 0);
+            struct CMD_LINE cmd_parsed = parsing(CMD, cmd);
+
+            /* Builtin command */
+            if (!strcmp(cmd, "exit")) {
+                fprintf(stderr, "Bye...\n");
+                fprintf(stderr, "+ completed '%s' [%d]\n",
+                        cmd, 0);
                 break;
             }
+                //https://iq.opengenus.org/chdir-fchdir-getcwd-in-c/ for getcwd
+            else if (!strcmp(cmd, "pwd")) {
+                char *current_path;
+                char *buffer = NULL;
+                current_path = getcwd(buffer, 0);
+                //Since we're assuming the builtin commands will
+                // always be correct,no need to check for errors
+                fprintf(stderr, "%s\n", current_path);
+            }
+                //https://iq.opengenus.org/chdir-fchdir-getcwd-in-c/ for chdir
+            else if (!strcmp(cmd, "cd")) {
+                int new_dir = chdir(cmd_parsed.argv[1]);
+                if (new_dir == -1) {
+                    fprintf(stderr, "Error: cannot cd into directory");
+                    fprintf(stderr, "+ completed '%s' [%d]\n", cmd_unchanged, 0);
+                    break;
+                }
+            } else {
+                /* Regular command */
+                retval = execution(cmd_parsed);
+            }
+        } else { //with piping
+            struct CMD_LINE *cmd_piping_parsed = piping_parsing(CMD, cmd);
+            execution_piping(cmd_piping_parsed);
         }
-//        else if (!env_var) {
-//            break;
-//        }
-        else {
-            /* Regular command */
-            retval = execution(cmd_parsed);
-        }
-
         fprintf(stderr, "+ completed '%s' [%d]\n", cmd_unchanged, retval);
     }
     return EXIT_SUCCESS;
