@@ -34,34 +34,34 @@ struct CMD_LINE redirection_check(struct CMD_LINE CMD, char *cmd) {
     char *piping_sign;
     char *redirection_sign;
 
-    redirection_sign = strstr(cmd,">");
-    piping_sign = strstr(cmd,"|");
-    for (int i = 0; i <= strlen(cmd); i++){
-        if (cmd[i] == '>'){
+    redirection_sign = strstr(cmd, ">");
+    piping_sign = strstr(cmd, "|");
+
+    for (int i = 0; i <= strlen(cmd); i++) {
+        if (cmd[i] == '>') {
             CMD.redirection = 1;
             cmd[i] = ' ';
             cmd_index = i;
             break;
-        }
-        else if(isspace(cmd[i])){ //count how many spaces there were before >
+        } else if (isspace(cmd[i])) { //count how many spaces there were before >
             space_ctr++;
         }
     }
-    if(CMD.redirection == 1){
-        if(space_ctr == cmd_index){ //is there a command before >?
+    if (CMD.redirection == 1) {
+        if (space_ctr == cmd_index) { //is there a command before >?
             fprintf(stderr, "Error: missing command\n");
             fflush(stdout);
         }
-        for(int i = cmd_index+1; i < strlen(cmd); i++){
+        for (int i = cmd_index + 1; i < strlen(cmd); i++) {
             if (!isspace(cmd[i])) {
                 cmd_exist_after = true;
             }
         }
-        if(!cmd_exist_after || cmd[cmd_index+1] == '\0'){
+        if (!cmd_exist_after || cmd[cmd_index + 1] == '\0') {
             fprintf(stderr, "Error: no output file \n");
             fflush(stdout);
         }
-        if(redirection_sign < piping_sign){
+        if (redirection_sign < piping_sign) {
             fprintf(stderr, "Error: mislocated output redirection \n");
             fflush(stdout);
         }
@@ -69,7 +69,7 @@ struct CMD_LINE redirection_check(struct CMD_LINE CMD, char *cmd) {
     return CMD;
 }
 
-void redirection_output(struct CMD_LINE CMD){
+void redirection_output(struct CMD_LINE CMD) {
 
     int fd;
     fd = open(CMD.redirection_file, O_WRONLY | O_CREAT | O_APPEND, 0600);
@@ -78,13 +78,13 @@ void redirection_output(struct CMD_LINE CMD){
 
 }
 
-struct CMD_LINE parsing(struct CMD_LINE CMD, char *cmd){
+struct CMD_LINE parsing(struct CMD_LINE CMD, char *cmd) {
 
     char *cmd_token;
     cmd_token = strtok(cmd, " ");
     int argv_ctr = 0;
 
-    while (cmd_token != NULL){
+    while (cmd_token != NULL) {
         CMD.argv[argv_ctr] = cmd_token;
         if (strlen(cmd_token) > TOKEN_MAX) {
             fprintf(stderr, "Error: exceeded max token count\n");
@@ -107,26 +107,26 @@ struct CMD_LINE parsing(struct CMD_LINE CMD, char *cmd){
 }
 
 // This code was inspired from syscalls lecture 'slide 20'
-int execution(struct CMD_LINE CMD){
+int execution(struct CMD_LINE CMD) {
     pid_t pid;
     int status;
     int stats;
 
-    pid= fork();
-    if (pid == 0){
+    pid = fork();
+    if (pid == 0) {
         //Child
-        if (CMD.redirection == 1){
+        if (CMD.redirection == 1) {
             CMD.redirection = 0;
             redirection_output(CMD);
         }
 
-        execvp(CMD.argv[0],CMD.argv);// might use execv
+        execvp(CMD.argv[0], CMD.argv);// might use execv
 
         fprintf(stderr, "Error: command not found\n");
         fflush(stdout);
         perror("execvp");
         exit(1);
-    } else if (pid > 0){
+    } else if (pid > 0) {
         //Parent
         //Waiting for the cloned process 'the child' to until it finish execution
         waitpid(pid, &status, 0);
@@ -143,26 +143,25 @@ int execution(struct CMD_LINE CMD){
 
 }
 
-bool check_env_var(char *cmd){
+bool check_env_var(char *cmd) {
 
     char *echo_exist;
     char *sign_exist;
     int sign_index;
     bool env_var = false;
 
-    echo_exist = strstr(cmd,"echo");
-    sign_exist = strstr(cmd,"$");
-    for(int i = 0; i < strlen(cmd)-1; i++){
-        if(cmd[i] == '$'){
+    echo_exist = strstr(cmd, "echo");
+    sign_exist = strstr(cmd, "$");
+    for (int i = 0; i < strlen(cmd) - 1; i++) {
+        if (cmd[i] == '$') {
             sign_index = i;
         }
     }
 
-    if(echo_exist < sign_exist){
-        if(islower(cmd[sign_index+1])  && (cmd[sign_index+2] == ' ' || sign_index+1 == strlen(cmd)-2)){
+    if (echo_exist < sign_exist) {
+        if (islower(cmd[sign_index + 1]) && (cmd[sign_index + 2] == ' ' || sign_index + 1 == strlen(cmd) - 2)) {
             env_var = true;
-        }
-        else{
+        } else {
             fprintf(stderr, "Error: invalid variable name \n");
             fflush(stdout);
             env_var = false;
@@ -172,20 +171,19 @@ bool check_env_var(char *cmd){
     return env_var;
 }
 
-void set_func(struct CMD_LINE CMD, char* new_val){
+void set_func(struct CMD_LINE CMD, char *new_val) {
     //check the second argument
-    char* check_sign;
-    check_sign = strstr(CMD.argv[2],"$");
-    if(check_sign!=NULL){
+    char *check_sign;
+    check_sign = strstr(CMD.argv[2], "$");
+    if (check_sign != NULL) {
         strcpy(CMD.argv[1], new_val);
-    }else{
+    } else {
         strcpy(CMD.argv[1], CMD.argv[2]);
     }
 
 }
 
-int main(void)
-{
+int main(void) {
     char cmd[CMDLINE_MAX];
     char cmd_unchanged[CMDLINE_MAX];
     char *path = "/bin/";
@@ -201,7 +199,7 @@ int main(void)
         fflush(stdout);
 
         /* Get command line and check if it's less than the maximum*/
-        if (!fgets(cmd, CMDLINE_MAX, stdin)){
+        if (!fgets(cmd, CMDLINE_MAX, stdin)) {
             break;
         };
 
@@ -245,16 +243,14 @@ int main(void)
         else if (!strcmp(cmd, "cd")) {
             int new_dir = chdir(cmd_parsed.argv[1]);
             if (new_dir == -1) {
-                fprintf(stderr,"Error: cannot cd into directory");
+                fprintf(stderr, "Error: cannot cd into directory");
                 fprintf(stderr, "+ completed '%s' [%d]\n",
                         cmd, 0);
                 break;
             }
-        }
-        else if(!env_var){
+        } else if (!env_var) {
             break;
-        }
-        else {
+        } else {
             /* Regular command */
             retval = execution(cmd_parsed);
         }
