@@ -238,9 +238,11 @@ int main(void) {
                         cmd, 0);
                 break;
             }
-        } else if (!env_var) {
-            break;
-        } else {
+        }
+//        else if (!env_var) {
+//            break;
+//        }
+        else {
             /* Regular command */
             retval = execution(cmd_parsed);
         }
