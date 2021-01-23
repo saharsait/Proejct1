@@ -193,7 +193,7 @@ int main(void) {
             break;
         };
 
-        env_var = check_env_var(cmd);
+        //env_var = check_env_var(cmd);
 
         /* Print command line if stdin is not provided by terminal */
         if (!isatty(STDIN_FILENO)) {
