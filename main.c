@@ -1,57 +1,198 @@
-
+#include <ctype.h>
+#include <dirent.h>
+#include <fcntl.h>
+#include <stdbool.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <sys/types.h>
+#include <sys/stat.h>
+#include <sys/wait.h>
 #include <unistd.h>
+#include <ctype.h>
 
 
+#define ARGV_MAX 16
 #define CMDLINE_MAX 512
-int token_ctr = 0;
+#define TOKEN_MAX 32
+#define P_MAX 50
 
-void cmd_check(char* cmd){
+struct CMD_LINE {
+    char *argv[ARGV_MAX];
+    char cmd[CMDLINE_MAX];
+    char *token[TOKEN_MAX];
+    int redirection;
+    char *redirection_file;
+};
 
-    int word_ctr = 1;
-    bool token_check = true;
-    for(int i = 0; i < strlen(cmd)-1; i++){
-        token_ctr++;
-        if(token_ctr >= 32){
-            token_check = !token_check;
-            token_ctr = 0;
+struct CMD_LINE redirection_check(struct CMD_LINE CMD, char *cmd) {
+
+    CMD.redirection = 0;
+    int cmd_index;
+    int space_ctr = 0;
+    bool cmd_exist_after;
+    char *piping_sign;
+    char *redirection_sign;
+
+    redirection_sign = strstr(cmd,">");
+    piping_sign = strstr(cmd,"|");
+    for (int i = 0; i <= strlen(cmd); i++){
+        if (cmd[i] == '>'){
+            CMD.redirection = 1;
+            cmd[i] = ' ';
+            cmd_index = i;
+            break;
         }
-        if(cmd[i]==' '){
-            word_ctr++;
-            if(token_ctr >= 32){
-                token_check = !token_check;
-                token_ctr = 0;
+        else if(isspace(cmd[i])){ //count how many spaces there were before >
+            space_ctr++;
+        }
+    }
+    if(CMD.redirection == 1){
+        if(space_ctr == cmd_index){ //is there a command before >?
+            fprintf(stderr, "Error: missing command\n");
+            fflush(stdout);
+        }
+        for(int i = cmd_index+1; i < strlen(cmd); i++){
+            if (!isspace(cmd[i])) {
+                cmd_exist_after = true;
             }
         }
+        if(!cmd_exist_after || cmd[cmd_index+1] == '\0'){
+            fprintf(stderr, "Error: no output file \n");
+            fflush(stdout);
+        }
+        if(redirection_sign < piping_sign){
+            fprintf(stderr, "Error: mislocated output redirection \n");
+            fflush(stdout);
+        }
     }
-    /* Print command line if stdin is not provided by terminal */
-    if (!isatty(STDIN_FILENO)) {
-        printf("%s", cmd);
+    return CMD;
+}
+
+void redirection_output(struct CMD_LINE CMD){
+
+    int fd;
+    fd = open(CMD.redirection_file, O_WRONLY | O_CREAT | O_APPEND, 0600);
+    dup2(fd, STDOUT_FILENO);
+    close(fd);
+
+}
+
+struct CMD_LINE parsing(struct CMD_LINE CMD, char *cmd){
+
+    char *cmd_token;
+    cmd_token = strtok(cmd, " ");
+    int argv_ctr = 0;
+
+    while (cmd_token != NULL){
+        CMD.argv[argv_ctr] = cmd_token;
+        if (strlen(cmd_token) > TOKEN_MAX) {
+            fprintf(stderr, "Error: exceeded max token count\n");
+            fflush(stdout);
+        }
+        cmd_token = strtok(NULL, " ");
+        argv_ctr++;
+    }
+
+    if (argv_ctr > ARGV_MAX) {
+        fprintf(stderr, "Error: too many process arguments\n");
+    }
+    if (CMD.redirection == 1) {
+        CMD.redirection_file = CMD.argv[argv_ctr - 1];
+    }
+    //set the last arguement = to NULL for the execvp function
+    CMD.argv[argv_ctr] = NULL;
+
+    return CMD;
+}
+
+// This code was inspired from syscalls lecture 'slide 20'
+int execution(struct CMD_LINE CMD){
+    pid_t pid;
+    int status;
+    int stats;
+
+    pid= fork();
+    if (pid == 0){
+        //Child
+        if (CMD.redirection == 1){
+            CMD.redirection = 0;
+            redirection_output(CMD);
+        }
+
+        execvp(CMD.argv[0],CMD.argv);// might use execv
+
+        fprintf(stderr, "Error: command not found\n");
         fflush(stdout);
+        perror("execvp");
+        exit(1);
+    } else if (pid > 0){
+        //Parent
+        //Waiting for the cloned process 'the child' to until it finish execution
+        waitpid(pid, &status, 0);
+        stats = WEXITSTATUS(status);
+
+    } else {
+        //In case of failing
+        perror("error with fork");
+        exit(1);
     }
-    /* check if arguments exceed 16 */
-    else if(word_ctr > 15){
-        printf("Error: too many process arguments \n");
+
+//    return status;
+    return stats;
+
+}
+
+bool check_env_var(char *cmd){
+
+    char *echo_exist;
+    char *sign_exist;
+    int sign_index;
+    bool env_var = false;
+
+    echo_exist = strstr(cmd,"echo");
+    sign_exist = strstr(cmd,"$");
+    for(int i = 0; i < strlen(cmd)-1; i++){
+        if(cmd[i] == '$'){
+            sign_index = i;
+        }
     }
-     /* check if argument exceeds 32 */
-    else if (!(token_check)){
-        printf("Error: exceeded max token count \n");
+
+    if(echo_exist < sign_exist){
+        if(islower(cmd[sign_index+1])  && (cmd[sign_index+2] == ' ' || sign_index+1 == strlen(cmd)-2)){
+            env_var = true;
+        }
+        else{
+            fprintf(stderr, "Error: invalid variable name \n");
+            fflush(stdout);
+            env_var = false;
+
+        }
+    }
+    return env_var;
+}
+
+void set_func(struct CMD_LINE CMD, char* new_val){
+    //check the second argument
+    char* check_sign;
+    check_sign = strstr(CMD.argv[2],"$");
+    if(check_sign!=NULL){
+        strcpy(CMD.argv[1], new_val);
+    }else{
+        strcpy(CMD.argv[1], CMD.argv[2]);
     }
 
 }
 
 int main(void)
 {
-    pid_t pid;
-
     char cmd[CMDLINE_MAX];
-    char *args[] = { cmd, "ECS150", NULL};
-    pid = fork();
+    char cmd_unchanged[CMDLINE_MAX];
+    char *path = "/bin/";
+    char full_path[P_MAX];
+    bool env_var = false;
 
     while (1) {
-
         char *nl;
         int retval;
 
@@ -59,43 +200,65 @@ int main(void)
         printf("sshell@ucd$ ");
         fflush(stdout);
 
-        /* Get command line */
-        fgets(cmd, CMDLINE_MAX, stdin);
-        cmd_check(cmd);
+        /* Get command line and check if it's less than the maximum*/
+        if (!fgets(cmd, CMDLINE_MAX, stdin)){
+            break;
+        };
+
+        env_var = check_env_var(cmd);
+
+        /* Print command line if stdin is not provided by terminal */
+        if (!isatty(STDIN_FILENO)) {
+            printf("%s", cmd);
+            fflush(stdout);
+        }
 
         /* Remove trailing newline from command line */
         nl = strchr(cmd, '\n');
         if (nl)
             *nl = '\0';
 
+        //Before determing the type of the command line, we need to parse
+        // the command line first, then check if it's valid and follows all
+        // the specified rules in the prompt
+        struct CMD_LINE CMD;
+        CMD = redirection_check(CMD, cmd);
+        struct CMD_LINE cmd_parsed = parsing(CMD, cmd);
+
         /* Builtin command */
         if (!strcmp(cmd, "exit")) {
             fprintf(stderr, "Bye...\n");
-            fprintf(stderr, "+ completed '%s' [%d]\n", cmd, 0);
+            fprintf(stderr, "+ completed '%s' [%d]\n",
+                    cmd, 0);
             break;
         }
-
-        /* Regular command */
-        retval = system(cmd);
-//         pid = fork();
-//         if (pid == 0) {
-//             /* Child */
-//             retval = execlp(cmd, cmd, NULL);
-//             perror("execv");
-//             exit(1);
-//         } else if (pid > 0) {
-//             /* Parent */
-//             int status;
-//             waitpid(pid, &status, 0);
-//             printf("Child returned %d\n",
-//                    WEXITSTATUS(status));
-//         } else {
-//             perror("fork");
-//             exit(1);
-//         }
-
+            //https://iq.opengenus.org/chdir-fchdir-getcwd-in-c/ for getcwd
+        else if (!strcmp(cmd, "pwd")) {
+            char *current_path;
+            char *buffer = NULL;
+            current_path = getcwd(buffer, 0);
+            //Since we're assuming the builtin commands will
+            // always be correct,no need to check for errors
+            fprintf(stderr, "%s\n", current_path);
+        }
+            //https://iq.opengenus.org/chdir-fchdir-getcwd-in-c/ for chdir
+        else if (!strcmp(cmd, "cd")) {
+            int new_dir = chdir(cmd_parsed.argv[1]);
+            if (new_dir == -1) {
+                fprintf(stderr,"Error: cannot cd into directory");
+                fprintf(stderr, "+ completed '%s' [%d]\n",
+                        cmd, 0);
+                break;
+            }
+        }
+        else if(!env_var){
+            break;
+        }
+        else {
+            /* Regular command */
+            retval = execution(cmd_parsed);
+        }
         fprintf(stderr, "+ completed '%s' [%d]\n", cmd, retval);
     }
-
     return EXIT_SUCCESS;
 }
