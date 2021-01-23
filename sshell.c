@@ -175,9 +175,9 @@ bool check_env_var(char *cmd) {
 
 int main(void) {
     char cmd[CMDLINE_MAX];
-    char cmd_unchanged[CMDLINE_MAX];
-    char *path = "/bin/";
-    char full_path[P_MAX];
+//    char cmd_unchanged[CMDLINE_MAX];
+//    char *path = "/bin/";
+//    char full_path[P_MAX];
     bool env_var = false;
 
     while (1) {
